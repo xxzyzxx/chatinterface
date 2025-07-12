@@ -580,7 +580,13 @@
             messages: [{
                 role: 'system',
                 content: 'You are a helpful AI assistant.'
-            }, {
+            },
+                                {
+                role: 'user',
+                content: 'Hello!',
+                hidden: true  // <--- custom flag to hide in UI
+            },   
+                       {
                 role: 'assistant',
                 content: 'Hi there! How can I help you today?'
             }]
@@ -687,6 +693,7 @@
 
     // Render the current conversation in the chat box
     function renderCurrentConversation() {
+        visibleMessages = conversation.messages.filter(msg => !msg.hidden);
         const conversation = conversations.find(c => c.id === currentConversationId);
         if (!conversation) return;
         
