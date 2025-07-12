@@ -90,7 +90,6 @@
         #main-content {
             flex-grow: 1;
             display: flex;
-            flex-direction: column;
             height: 100vh;
         }
         
@@ -291,6 +290,96 @@
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-5px); }
         }
+
+        /* Settings sidebar styles */
+        #settings-sidebar {
+            width: 250px;
+            background-color: #1a1a1a;
+            border-left: 1px solid #333;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        #settings-sidebar h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #e0e0e0;
+            font-size: 1.2em;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .settings-group {
+            margin-bottom: 20px;
+        }
+
+        .settings-group h3 {
+            margin: 0 0 10px 0;
+            color: #e0e0e0;
+            font-size: 1em;
+        }
+
+        .setting-item {
+            margin-bottom: 15px;
+        }
+
+        .setting-item label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .setting-item input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .setting-item .value-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        .setting-item input[type="number"] {
+            width: 100%;
+            padding: 5px;
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            border-radius: 3px;
+            color: #e0e0e0;
+        }
+
+        #save-settings {
+            width: 100%;
+            padding: 8px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        #save-settings:hover {
+            background-color: #218838;
+        }
+
+        #reset-settings {
+            width: 100%;
+            padding: 8px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        #reset-settings:hover {
+            background-color: #5a6268;
+        }
     </style>
 </head>
 <body>
@@ -321,6 +410,66 @@
     </div>
 </div>
 
+<div id="settings-sidebar">
+    <h2>Model Settings</h2>
+    
+    <div class="settings-group">
+        <h3>Generation Parameters</h3>
+        
+        <div class="setting-item">
+            <label for="temperature">Temperature</label>
+            <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
+            <div class="value-display">
+                <span>0 (Deterministic)</span>
+                <span id="temperature-value">0.7</span>
+                <span>2 (Creative)</span>
+            </div>
+        </div>
+        
+        <div class="setting-item">
+            <label for="top-k">Top K Sampling</label>
+            <input type="number" id="top-k" min="0" max="100" step="1" value="40">
+            <div class="value-display">
+                <span>0 (Disabled)</span>
+                <span>100 (Max)</span>
+            </div>
+        </div>
+        
+        <div class="setting-item">
+            <label for="top-p">Top P Sampling</label>
+            <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.9">
+            <div class="value-display">
+                <span>0 (Strict)</span>
+                <span id="top-p-value">0.9</span>
+                <span>1 (Broad)</span>
+            </div>
+        </div>
+        
+        <div class="setting-item">
+            <label for="min-p">Min P Sampling</label>
+            <input type="range" id="min-p" min="0" max="1" step="0.05" value="0.05">
+            <div class="value-display">
+                <span>0 (Disabled)</span>
+                <span id="min-p-value">0.05</span>
+                <span>1 (Max)</span>
+            </div>
+        </div>
+        
+        <div class="setting-item">
+            <label for="repeat-penalty">Repeat Penalty</label>
+            <input type="range" id="repeat-penalty" min="1" max="2" step="0.1" value="1.1">
+            <div class="value-display">
+                <span>1 (None)</span>
+                <span id="repeat-penalty-value">1.1</span>
+                <span>2 (Strong)</span>
+            </div>
+        </div>
+    </div>
+    
+    <button id="save-settings">Save Settings</button>
+    <button id="reset-settings">Reset to Defaults</button>
+</div>
+
 <script>
     const chatBox = document.getElementById('chat-box');
     const userInput = document.getElementById('user-input');
@@ -328,6 +477,28 @@
     const inputForm = document.getElementById('input-area');
     const newChatButton = document.getElementById('new-chat-button');
     const chatHistoryContainer = document.getElementById('chat-history');
+
+    // Settings elements
+    const temperatureSlider = document.getElementById('temperature');
+    const temperatureValue = document.getElementById('temperature-value');
+    const topKInput = document.getElementById('top-k');
+    const topPSlider = document.getElementById('top-p');
+    const topPValue = document.getElementById('top-p-value');
+    const minPSlider = document.getElementById('min-p');
+    const minPValue = document.getElementById('min-p-value');
+    const repeatPenaltySlider = document.getElementById('repeat-penalty');
+    const repeatPenaltyValue = document.getElementById('repeat-penalty-value');
+    const saveSettingsButton = document.getElementById('save-settings');
+    const resetSettingsButton = document.getElementById('reset-settings');
+
+    // Current model settings
+    let modelSettings = {
+        temperature: 0.7,
+        top_k: 40,
+        top_p: 0.9,
+        min_p: 0.05,
+        repeat_penalty: 1.1
+    };
 
     // !!! IMPORTANT: Replace this URL with your Cloudflare Tunnel domain
     const apiUrl = 'https://llm.empireofdusk.org/v1/chat/completions';
@@ -377,70 +548,69 @@
         renderChatHistory();
         renderCurrentConversation();
     }
-function parseMarkdown(text) {
-    // STEP 1: Protect LaTeX blocks so Markdown doesn't touch them
-    const placeholder = `\uE000${Math.random().toString(36).slice(2)}\uE001`;
-    const latexBlocks = [];
-    let index = 0;
 
-    // Regex to match LaTeX expressions: $$...$$, $...$, \( ... \), \[ ... \]
-    const latexRegex = /(\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\\\([^\)]+\\\)|\\\[[^\]]+\\\])/g;
+    function parseMarkdown(text) {
+        // STEP 1: Protect LaTeX blocks so Markdown doesn't touch them
+        const placeholder = `\uE000${Math.random().toString(36).slice(2)}\uE001`;
+        const latexBlocks = [];
+        let index = 0;
 
-    text = text.replace(latexRegex, match => {
-        const token = `${placeholder}${index}${placeholder}`;
-        latexBlocks.push(match);
-        return token;
-    });
+        // Regex to match LaTeX expressions: $$...$$, $...$, \( ... \), \[ ... \]
+        const latexRegex = /(\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\\\([^\)]+\\\)|\\\[[^\]]+\\\])/g;
 
-    // STEP 2: Apply Markdown formatting
-    text = text
-        .replace(/^####\s+(.*)$/gm, '<h4>$1</h4>')
-        .replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
-        .replace(/^##\s+(.*)$/gm, '<h2>$1</h2>')
-        .replace(/^#\s+(.*)$/gm, '<h1>$1</h1>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-        .replace(/```([a-z]*)\n([\s\S]*?)\n```/g, '<pre><code class="language-$1">$2</code></pre>')
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/^>\s+(.*)$/gm, '<blockquote>$1</blockquote>')
-        .replace(/^\s*---\s*$/gm, '<hr>')
-        .replace(/^\s*-\s+(.*)$/gm, '<li>$1</li>')
-        .replace(/^\s*\d+\.\s+(.*)$/gm, '<li>$1</li>')
-        .replace(/(<li>.*<\/li>)+/gs, match => `<ul>${match}</ul>`);
+        text = text.replace(latexRegex, match => {
+            const token = `${placeholder}${index}${placeholder}`;
+            latexBlocks.push(match);
+            return token;
+        });
 
-    // STEP 3: Wrap non-block lines in <p> tags
-    const lines = text.split('\n');
-    const output = [];
-    let buffer = [];
+        // STEP 2: Apply Markdown formatting
+        text = text
+            .replace(/^####\s+(.*)$/gm, '<h4>$1</h4>')
+            .replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+            .replace(/^##\s+(.*)$/gm, '<h2>$1</h2>')
+            .replace(/^#\s+(.*)$/gm, '<h1>$1</h1>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            .replace(/```([a-z]*)\n([\s\S]*?)\n```/g, '<pre><code class="language-$1">$2</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/^>\s+(.*)$/gm, '<blockquote>$1</blockquote>')
+            .replace(/^\s*---\s*$/gm, '<hr>')
+            .replace(/^\s*-\s+(.*)$/gm, '<li>$1</li>')
+            .replace(/^\s*\d+\.\s+(.*)$/gm, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)+/gs, match => `<ul>${match}</ul>`);
 
-    const flush = () => {
-        if (buffer.length > 0) {
-            output.push(`<p>${buffer.join(' ')}</p>`);
-            buffer = [];
+        // STEP 3: Wrap non-block lines in <p> tags
+        const lines = text.split('\n');
+        const output = [];
+        let buffer = [];
+
+        const flush = () => {
+            if (buffer.length > 0) {
+                output.push(`<p>${buffer.join(' ')}</p>`);
+                buffer = [];
+            }
+        };
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) {
+                flush();
+            } else if (/^<(h\d|ul|ol|pre|blockquote|div|hr|p|li)/.test(trimmed)) {
+                flush();
+                output.push(trimmed);
+            } else {
+                buffer.push(trimmed);
+            }
         }
-    };
+        flush();
 
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) {
-            flush();
-        } else if (/^<(h\d|ul|ol|pre|blockquote|div|hr|p|li)/.test(trimmed)) {
-            flush();
-            output.push(trimmed);
-        } else {
-            buffer.push(trimmed);
-        }
+        // STEP 4: Restore LaTeX expressions
+        const restoreRegex = new RegExp(`${placeholder}(\\d+)${placeholder}`, 'g');
+        const finalHtml = output.join('\n').replace(restoreRegex, (_, i) => latexBlocks[+i]);
+
+        return finalHtml.trim();
     }
-    flush();
-
-    // STEP 4: Restore LaTeX expressions
-    const restoreRegex = new RegExp(`${placeholder}(\\d+)${placeholder}`, 'g');
-    const finalHtml = output.join('\n').replace(restoreRegex, (_, i) => latexBlocks[+i]);
-
-    return finalHtml.trim();
-}
-
-
 
     // Function to render MathJax in a specific element
     function renderMath(element) {
@@ -498,6 +668,59 @@ function parseMarkdown(text) {
         chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to the bottom
     };
 
+    // Update slider value displays
+    function updateSliderDisplays() {
+        temperatureValue.textContent = temperatureSlider.value;
+        topPValue.textContent = topPSlider.value;
+        minPValue.textContent = minPSlider.value;
+        repeatPenaltyValue.textContent = repeatPenaltySlider.value;
+    }
+
+    // Load settings from localStorage
+    function loadSettings() {
+        const savedSettings = localStorage.getItem('modelSettings');
+        if (savedSettings) {
+            modelSettings = JSON.parse(savedSettings);
+            
+            // Update UI elements
+            temperatureSlider.value = modelSettings.temperature;
+            topKInput.value = modelSettings.top_k;
+            topPSlider.value = modelSettings.top_p;
+            minPSlider.value = modelSettings.min_p;
+            repeatPenaltySlider.value = modelSettings.repeat_penalty;
+            
+            updateSliderDisplays();
+        }
+    }
+
+    // Save settings to localStorage
+    function saveSettings() {
+        modelSettings = {
+            temperature: parseFloat(temperatureSlider.value),
+            top_k: parseInt(topKInput.value),
+            top_p: parseFloat(topPSlider.value),
+            min_p: parseFloat(minPSlider.value),
+            repeat_penalty: parseFloat(repeatPenaltySlider.value)
+        };
+        
+        localStorage.setItem('modelSettings', JSON.stringify(modelSettings));
+        alert('Settings saved!');
+    }
+
+    // Reset settings to defaults
+    function resetSettings() {
+        if (confirm('Reset all settings to default values?')) {
+            temperatureSlider.value = 0.7;
+            topKInput.value = 40;
+            topPSlider.value = 0.9;
+            minPSlider.value = 0.05;
+            repeatPenaltySlider.value = 1.1;
+            
+            updateSliderDisplays();
+            saveSettings();
+        }
+    }
+
     // Handle form submission
     inputForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -546,7 +769,11 @@ function parseMarkdown(text) {
                 body: JSON.stringify({
                     model: 'local-model',
                     messages: messagesToSend,
-                    temperature: 0.7,
+                    temperature: modelSettings.temperature,
+                    top_k: modelSettings.top_k,
+                    top_p: modelSettings.top_p,
+                    min_p: modelSettings.min_p,
+                    repeat_penalty: modelSettings.repeat_penalty,
                     stream: false
                 }),
             });
@@ -578,7 +805,26 @@ function parseMarkdown(text) {
         e.preventDefault();
         initNewConversation();
     });
-</script>
 
+    // Initialize slider value displays
+    temperatureSlider.addEventListener('input', updateSliderDisplays);
+    topPSlider.addEventListener('input', updateSliderDisplays);
+    minPSlider.addEventListener('input', updateSliderDisplays);
+    repeatPenaltySlider.addEventListener('input', updateSliderDisplays);
+
+    // Handle settings buttons
+    saveSettingsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        saveSettings();
+    });
+
+    resetSettingsButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        resetSettings();
+    });
+
+    // Initialize the app
+    loadSettings();
+</script>
 </body>
 </html>
