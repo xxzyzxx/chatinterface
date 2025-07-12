@@ -131,6 +131,35 @@
             align-self: flex-start;
         }
         
+        /* Thinking bubble styles */
+        .thinking-bubble {
+            background-color: #2a2a2a;
+            border-radius: 18px;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            max-width: 80%;
+            align-self: flex-start;
+            border: 1px solid #444;
+            font-style: italic;
+            color: #aaa;
+            position: relative;
+        }
+        
+        .thinking-bubble:after {
+            content: '';
+            position: absolute;
+            left: 20px;
+            bottom: -10px;
+            width: 0;
+            height: 0;
+            border: 10px solid transparent;
+            border-top-color: #2a2a2a;
+            border-bottom: 0;
+            border-left: 0;
+            margin-left: -10px;
+            margin-bottom: -10px;
+        }
+        
         /* Markdown styling */
         .ai-message h1, .ai-message h2, .ai-message h3, .ai-message h4 {
             margin: 15px 0 10px 0;
@@ -561,6 +590,7 @@
         text = text.replace(latexRegex, match => {
             const token = `${placeholder}${index}${placeholder}`;
             latexBlocks.push(match);
+            index++;
             return token;
         });
 
@@ -666,6 +696,17 @@
         
         chatBox.appendChild(messageElement);
         chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to the bottom
+        return messageElement;
+    };
+
+    // Function to add a thinking bubble
+    const addThinkingBubble = (content) => {
+        const bubble = document.createElement('div');
+        bubble.classList.add('thinking-bubble');
+        bubble.textContent = content;
+        chatBox.appendChild(bubble);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return bubble;
     };
 
     // Update slider value displays
@@ -761,6 +802,15 @@
                 ...conversation.messages.slice(-6) // last 3 exchanges (user + assistant)
             ];
 
+            // Create a response container that we'll stream into
+            const responseContainer = document.createElement('div');
+            responseContainer.classList.add('message', 'ai-message');
+            chatBox.removeChild(typingIndicator);
+            chatBox.appendChild(responseContainer);
+            
+            // Create a thinking bubble container (will be shown if chain-of-thought is used)
+            let thinkingBubble = null;
+            
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
@@ -774,7 +824,7 @@
                     top_p: modelSettings.top_p,
                     min_p: modelSettings.min_p,
                     repeat_penalty: modelSettings.repeat_penalty,
-                    stream: false
+                    stream: true
                 }),
             });
 
@@ -782,13 +832,63 @@
                 throw new Error(`API Error: ${response.status} ${response.statusText}`);
             }
 
-            const data = await response.json();
-            const aiMessage = data.choices[0].message.content;
+            // Process the streaming response
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let fullResponse = '';
+            let buffer = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep the last incomplete line in buffer
+                
+                for (const line of lines) {
+                    if (line.startsWith('data:') && !line.includes('[DONE]')) {
+                        try {
+                            const data = JSON.parse(line.substring(5).trim());
+                            const content = data.choices[0].delta.content;
+                            
+                            if (content) {
+                                fullResponse += content;
+                                
+                                // Check if this is chain-of-thought (might start with "Thought:" or similar)
+                                if (content.includes('Thought:') || (thinkingBubble && !fullResponse.includes('\n\n'))) {
+                                    if (!thinkingBubble) {
+                                        thinkingBubble = addThinkingBubble(content);
+                                    } else {
+                                        thinkingBubble.textContent += content;
+                                    }
+                                } else {
+                                    // If we had a thinking bubble but now we're in the main response, remove it
+                                    if (thinkingBubble) {
+                                        chatBox.removeChild(thinkingBubble);
+                                        thinkingBubble = null;
+                                    }
+                                    
+                                    // Update the main response
+                                    responseContainer.innerHTML = parseMarkdown(fullResponse);
+                                    renderMath(responseContainer);
+                                }
+                                
+                                chatBox.scrollTop = chatBox.scrollHeight;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing stream data:', e);
+                        }
+                    }
+                }
+            }
 
-            // Remove the typing indicator and add the real response
-            chatBox.removeChild(typingIndicator);
-            addMessage(aiMessage, 'ai');
-            conversation.messages.push({ role: 'assistant', content: aiMessage });
+            // Final update to ensure all content is rendered
+            responseContainer.innerHTML = parseMarkdown(fullResponse);
+            renderMath(responseContainer);
+            
+            // Add the final response to the conversation history
+            conversation.messages.push({ role: 'assistant', content: fullResponse });
 
         } catch (error) {
             console.error('Error fetching from local LLM:', error);
