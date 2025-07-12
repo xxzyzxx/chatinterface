@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local LLM Chat</title>
     <!-- Add MathJax for LaTeX rendering -->
-<script>
-  window.MathJax = {
-    tex: {
-      inlineMath: [['$', '$'], ['\\(', '\\)']],
-      displayMath: [['$$', '$$'], ['\\[', '\\]']]
-    },
-    svg: { fontCache: 'global' }
-  };
-</script>
-<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']]
+        },
+        svg: { fontCache: 'global' }
+      };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
     <style>
         body {
@@ -90,7 +90,30 @@
         #main-content {
             flex-grow: 1;
             display: flex;
+            flex-direction: column;
             height: 100vh;
+        }
+
+        #model-selector {
+            padding: 10px;
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #333;
+            display: flex;
+            align-items: center;
+        }
+
+        #model-selector label {
+            margin-right: 10px;
+            color: #aaa;
+        }
+
+        #model-select {
+            flex-grow: 1;
+            padding: 5px;
+            background-color: #2c2c2c;
+            border: 1px solid #444;
+            border-radius: 3px;
+            color: #e0e0e0;
         }
         
         #chat-container {
@@ -428,6 +451,13 @@
 </div>
 
 <div id="main-content">
+    <div id="model-selector">
+        <label for="model-select">Model:</label>
+        <select id="model-select">
+            <option value="">Loading models...</option>
+        </select>
+    </div>
+    
     <div id="chat-container">
         <div id="chat-box">
             <div class="message ai-message">Hi there! How can I help you today?</div>
@@ -440,10 +470,10 @@
 </div>
 
 <div id="settings-sidebar">
-    <h2>Model Settings</h2>
+    <h2>Generation Settings</h2>
     
     <div class="settings-group">
-        <h3>Generation Parameters</h3>
+        <h3>Parameters</h3>
         
         <div class="setting-item">
             <label for="temperature">Temperature</label>
@@ -506,6 +536,7 @@
     const inputForm = document.getElementById('input-area');
     const newChatButton = document.getElementById('new-chat-button');
     const chatHistoryContainer = document.getElementById('chat-history');
+    const modelSelect = document.getElementById('model-select');
 
     // Settings elements
     const temperatureSlider = document.getElementById('temperature');
@@ -529,8 +560,13 @@
         repeat_penalty: 1.1
     };
 
-    // !!! IMPORTANT: Replace this URL with your Cloudflare Tunnel domain
-    const apiUrl = 'https://llm.empireofdusk.org/v1/chat/completions';
+    // Current model
+    let currentModel = '';
+
+    // API endpoints
+    const apiBaseUrl = 'https://llm.empireofdusk.org';
+    const apiUrl = `${apiBaseUrl}/v1/chat/completions`;
+    const modelsUrl = `${apiBaseUrl}/v1/models`;
 
     // Store all conversations
     let conversations = [];
@@ -762,6 +798,49 @@
         }
     }
 
+    // Fetch available models from server
+    async function fetchModels() {
+        try {
+            const response = await fetch(modelsUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            return data.data.map(model => model.id);
+        } catch (error) {
+            console.error('Failed to fetch models:', error);
+            return [];
+        }
+    }
+
+    // Populate model dropdown with available models
+    async function populateModelDropdown() {
+        const modelSelect = document.getElementById('model-select');
+        modelSelect.innerHTML = '<option value="">Loading models...</option>';
+        
+        const models = await fetchModels();
+        
+        if (models.length === 0) {
+            modelSelect.innerHTML = '<option value="">No models available</option>';
+            return;
+        }
+        
+        modelSelect.innerHTML = ''; // Clear loading message
+        
+        models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model;
+            modelSelect.appendChild(option);
+        });
+        
+        // Select the first model by default
+        if (models.length > 0) {
+            currentModel = models[0];
+            modelSelect.value = models[0];
+        }
+    }
+
     // Handle form submission
     inputForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -817,7 +896,7 @@
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    model: 'local-model',
+                    model: currentModel,
                     messages: messagesToSend,
                     temperature: modelSettings.temperature,
                     top_k: modelSettings.top_k,
@@ -906,6 +985,13 @@
         initNewConversation();
     });
 
+    // Handle model selection change
+    modelSelect.addEventListener('change', (e) => {
+        currentModel = e.target.value;
+        // Start a new conversation when model changes
+        initNewConversation();
+    });
+
     // Initialize slider value displays
     temperatureSlider.addEventListener('input', updateSliderDisplays);
     topPSlider.addEventListener('input', updateSliderDisplays);
@@ -924,7 +1010,14 @@
     });
 
     // Initialize the app
-    loadSettings();
+    async function initialize() {
+        await populateModelDropdown();
+        loadSettings();
+        initNewConversation();
+    }
+
+    // Start the application
+    initialize();
 </script>
 </body>
 </html>
