@@ -4,6 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local LLM Chat</title>
+    <!-- Add MathJax for LaTeX rendering -->
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']]
+    },
+    svg: { fontCache: 'global' }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -118,6 +130,101 @@
             background-color: #3a3a3a;
             color: #e0e0e0;
             align-self: flex-start;
+        }
+        
+        /* Markdown styling */
+        .ai-message h1, .ai-message h2, .ai-message h3, .ai-message h4 {
+            margin: 15px 0 10px 0;
+            color: #ffffff;
+        }
+        
+        .ai-message h1 {
+            font-size: 1.5em;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        
+        .ai-message h2 {
+            font-size: 1.3em;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        
+        .ai-message h3 {
+            font-size: 1.1em;
+        }
+        
+        .ai-message h4 {
+            font-size: 1em;
+        }
+        
+        .ai-message strong {
+            font-weight: bold;
+            color: #ffffff;
+        }
+        
+        .ai-message em {
+            font-style: italic;
+        }
+        
+        .ai-message code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #2a2a2a;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        
+        .ai-message pre {
+            background-color: #2a2a2a;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        
+        .ai-message pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        
+        .ai-message ul, .ai-message ol {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+        
+        .ai-message li {
+            margin-bottom: 5px;
+        }
+        
+        .ai-message blockquote {
+            border-left: 3px solid #007bff;
+            padding-left: 10px;
+            margin: 10px 0;
+            color: #aaa;
+        }
+        
+        .ai-message hr {
+            border: none;
+            border-top: 1px solid #444;
+            margin: 15px 0;
+        }
+        
+        /* MathJax container styling */
+        .ai-message .math-container {
+            margin: 10px 0;
+            padding: 5px;
+            text-align: center;
+        }
+        
+        /* Inline math styling */
+        .ai-message .math-inline {
+            display: inline;
+        }
+        
+        /* Paragraph spacing */
+        .ai-message p {
+            margin: 8px 0;
         }
         
         #input-area {
@@ -270,6 +377,77 @@
         renderChatHistory();
         renderCurrentConversation();
     }
+function parseMarkdown(text) {
+    // STEP 1: Protect LaTeX blocks so Markdown doesn't touch them
+    const placeholder = `\uE000${Math.random().toString(36).slice(2)}\uE001`;
+    const latexBlocks = [];
+    let index = 0;
+
+    // Regex to match LaTeX expressions: $$...$$, $...$, \( ... \), \[ ... \]
+    const latexRegex = /(\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\\\([^\)]+\\\)|\\\[[^\]]+\\\])/g;
+
+    text = text.replace(latexRegex, match => {
+        const token = `${placeholder}${index}${placeholder}`;
+        latexBlocks.push(match);
+        return token;
+    });
+
+    // STEP 2: Apply Markdown formatting
+    text = text
+        .replace(/^####\s+(.*)$/gm, '<h4>$1</h4>')
+        .replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
+        .replace(/^##\s+(.*)$/gm, '<h2>$1</h2>')
+        .replace(/^#\s+(.*)$/gm, '<h1>$1</h1>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+        .replace(/```([a-z]*)\n([\s\S]*?)\n```/g, '<pre><code class="language-$1">$2</code></pre>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/^>\s+(.*)$/gm, '<blockquote>$1</blockquote>')
+        .replace(/^\s*---\s*$/gm, '<hr>')
+        .replace(/^\s*-\s+(.*)$/gm, '<li>$1</li>')
+        .replace(/^\s*\d+\.\s+(.*)$/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)+/gs, match => `<ul>${match}</ul>`);
+
+    // STEP 3: Wrap non-block lines in <p> tags
+    const lines = text.split('\n');
+    const output = [];
+    let buffer = [];
+
+    const flush = () => {
+        if (buffer.length > 0) {
+            output.push(`<p>${buffer.join(' ')}</p>`);
+            buffer = [];
+        }
+    };
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) {
+            flush();
+        } else if (/^<(h\d|ul|ol|pre|blockquote|div|hr|p|li)/.test(trimmed)) {
+            flush();
+            output.push(trimmed);
+        } else {
+            buffer.push(trimmed);
+        }
+    }
+    flush();
+
+    // STEP 4: Restore LaTeX expressions
+    const restoreRegex = new RegExp(`${placeholder}(\\d+)${placeholder}`, 'g');
+    const finalHtml = output.join('\n').replace(restoreRegex, (_, i) => latexBlocks[+i]);
+
+    return finalHtml.trim();
+}
+
+
+
+    // Function to render MathJax in a specific element
+    function renderMath(element) {
+        if (typeof MathJax !== 'undefined') {
+            MathJax.typesetPromise([element]).catch(err => console.log('MathJax typeset error:', err));
+        }
+    }
 
     // Render the current conversation in the chat box
     function renderCurrentConversation() {
@@ -281,7 +459,20 @@
         // Only render user and assistant messages (skip system messages)
         conversation.messages.forEach(msg => {
             if (msg.role === 'user' || msg.role === 'assistant') {
-                addMessage(msg.content, msg.role === 'user' ? 'user' : 'ai');
+                const messageElement = document.createElement('div');
+                messageElement.classList.add('message', msg.role === 'user' ? 'user-message' : 'ai-message');
+                
+                if (msg.role === 'assistant') {
+                    // Parse markdown for AI messages
+                    messageElement.innerHTML = parseMarkdown(msg.content);
+                    // Render any math in this message
+                    renderMath(messageElement);
+                } else {
+                    // Keep user messages as plain text (or parse if you want)
+                    messageElement.textContent = msg.content;
+                }
+                
+                chatBox.appendChild(messageElement);
             }
         });
         
@@ -292,7 +483,17 @@
     const addMessage = (content, sender) => {
         const messageElement = document.createElement('div');
         messageElement.classList.add('message', `${sender}-message`);
-        messageElement.textContent = content;
+        
+        if (sender === 'ai') {
+            // Parse markdown for AI messages
+            messageElement.innerHTML = parseMarkdown(content);
+            // Render any math in this message
+            renderMath(messageElement);
+        } else {
+            // Keep user messages as plain text
+            messageElement.textContent = content;
+        }
+        
         chatBox.appendChild(messageElement);
         chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to the bottom
     };
