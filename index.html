@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local LLM Chat</title>
-    <!-- Add MathJax for LaTeX rendering -->
     <script>
       window.MathJax = {
         tex: {
@@ -15,7 +14,6 @@
       };
     </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -27,6 +25,7 @@
             overflow: hidden;
         }
         
+        /* Sidebar Styles */
         #sidebar {
             width: 250px;
             background-color: #1a1a1a;
@@ -34,6 +33,7 @@
             display: flex;
             flex-direction: column;
             height: 100vh;
+            flex-shrink: 0;
         }
         
         #sidebar-header {
@@ -87,26 +87,30 @@
             background-color: #007bff;
         }
         
-        #main-content {
+        /* Main Content Area */
+       #main-content {
             flex-grow: 1;
             display: flex;
             flex-direction: column;
             height: 100vh;
+            min-width: 0;
+            overflow: hidden;
         }
-
+        
         #model-selector {
             padding: 10px;
             background-color: #1e1e1e;
             border-bottom: 1px solid #333;
             display: flex;
             align-items: center;
+            flex-shrink: 0;
         }
-
+        
         #model-selector label {
             margin-right: 10px;
             color: #aaa;
         }
-
+        
         #model-select {
             flex-grow: 1;
             padding: 5px;
@@ -116,42 +120,63 @@
             color: #e0e0e0;
         }
         
+        /* Chat and Settings Container */
+        #chat-and-settings {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Chat Container */
         #chat-container {
             flex-grow: 1;
-            max-width: 800px;
-            width: 100%;
-            margin: 0 auto;
-            height: 100%;
             display: flex;
             flex-direction: column;
             background-color: #1e1e1e;
+            min-width: 0;
+            width: calc(100% - 250px); /* Ensure it leaves space for settings sidebar */
         }
         
         #chat-box {
-            flex-grow: 1;
+            flex: 1;
             padding: 20px;
             overflow-y: auto;
+            padding-bottom: 80px; /* Space for input area */
         }
         
-        .message {
-            margin-bottom: 15px;
-            padding: 10px 15px;
-            border-radius: 18px;
-            max-width: 80%;
-            line-height: 1.5;
-        }
+        /* Message Styles */
+.message {
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    border-radius: 18px;
+    max-width: 100%;
+    line-height: 1.5;
+    word-break: break-word; /* More aggressive word breaking */
+    overflow-wrap: anywhere; /* Allows breaking anywhere if needed */
+    white-space: pre-wrap; /* Preserve spaces and line breaks but wrap */
+    width: fit-content; /* Only take needed width */
+
+}
+.user-message {
+    background-color: #007bff;
+    color: white;
+    margin-left: 200px; /* Keep right-aligned */
+    margin-right: 0;
+    max-width: min(50%, 100%); /* More flexible max-width */
+}
         
-        .user-message {
-            background-color: #007bff;
-            color: white;
-            align-self: flex-end;
-            margin-left: auto;
-        }
+.ai-message {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+    margin-right: auto; /* Keep left-aligned */
+    max-width: 70%; /* Slightly narrower than user messages */
+}
         
-        .ai-message {
-            background-color: #3a3a3a;
-            color: #e0e0e0;
-            align-self: flex-start;
+        .image-message {
+            max-width: 100%;
+            border-radius: 8px;
+            margin: 5px 0;
         }
         
         /* Thinking bubble styles */
@@ -278,11 +303,23 @@
             margin: 8px 0;
         }
         
-        #input-area {
-            display: flex;
+      /* Input Area */
+        #input-area-container {
+            position: sticky;
+            bottom: 0;
+    		width: calc(100% - 280px); /* Match the width with chat-container */
+    margin-right: 250px; /* Push it right by the sidebar width */
+            background-color: #1e1e1e;
             padding: 15px;
             border-top: 1px solid #333;
-            background-color: #1e1e1e;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+
+        #input-area {
+            display: flex;
+            width: 100%;
+            align-items: center;
         }
         
         #user-input {
@@ -294,6 +331,25 @@
             color: #e0e0e0;
             font-size: 1rem;
             margin-right: 10px;
+        }
+        
+        #upload-button {
+            padding: 10px;
+            border: none;
+            background-color: transparent;
+            color: #e0e0e0;
+            cursor: pointer;
+            margin-right: 10px;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+        
+        #upload-button:hover {
+            background-color: #333;
+        }
+        
+        #file-input {
+            display: none;
         }
         
         #send-button {
@@ -343,13 +399,18 @@
             50% { transform: translateY(-5px); }
         }
 
-        /* Settings sidebar styles */
+        /* Settings Sidebar */
         #settings-sidebar {
             width: 250px;
             background-color: #1a1a1a;
             border-left: 1px solid #333;
             padding: 15px;
             overflow-y: auto;
+            flex-shrink: 0;
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
         }
 
         #settings-sidebar h2 {
@@ -436,6 +497,7 @@
 </head>
 <body>
 
+<!-- Left Sidebar -->
 <div id="sidebar">
     <div id="sidebar-header">
         <button id="new-chat-button">
@@ -450,7 +512,9 @@
     </div>
 </div>
 
+<!-- Main Content Area -->
 <div id="main-content">
+    <!-- Model Selector -->
     <div id="model-selector">
         <label for="model-select">Model:</label>
         <select id="model-select">
@@ -458,75 +522,89 @@
         </select>
     </div>
     
-    <div id="chat-container">
-        <div id="chat-box">
-            <div class="message ai-message">Hi there! How can I help you today?</div>
-        </div>
+    <!-- Chat and Settings Container -->
+    <div id="chat-and-settings">
+        <!-- Chat Container -->
+<div id="chat-container">
+    <div id="chat-box">
+        <div class="message ai-message">Hi there! How can I help you today?</div>
+    </div>
+            
+   <!-- Input Area -->
+    <div id="input-area-container">
         <form id="input-area">
+            <input type="file" id="file-input" accept="image/*" style="display: none;">
+            <button type="button" id="upload-button" title="Upload Image">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M4 16L8.586 11.414C8.961 11.039 9.47 10.828 10 10.828C10.53 10.828 11.039 11.039 11.414 11.414L16 16M14 14L15.586 12.414C15.961 12.039 16.47 11.828 17 11.828C17.53 11.828 18.039 12.039 18.414 12.414L20 14M14 8H14.01M6 20H18C19.1046 20 20 19.1046 20 18V6C20 4.89543 19.1046 4 18 4H6C4.89543 4 4 4.89543 4 6V18C4 19.1046 4.89543 20 6 20Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
             <input type="text" id="user-input" placeholder="Type your message..." autocomplete="off">
             <button id="send-button" type="submit">Send</button>
         </form>
     </div>
-</div>
-
-<div id="settings-sidebar">
-    <h2>Generation Settings</h2>
-    
-    <div class="settings-group">
-        <h3>Parameters</h3>
-        
-        <div class="setting-item">
-            <label for="temperature">Temperature</label>
-            <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
-            <div class="value-display">
-                <span>0 (Deterministic)</span>
-                <span id="temperature-value">0.7</span>
-                <span>2 (Creative)</span>
+</div>        
+        <!-- Settings Sidebar -->
+        <div id="settings-sidebar">
+            <h2>Generation Settings</h2>
+            
+            <div class="settings-group">
+                <h3>Parameters</h3>
+                
+                <div class="setting-item">
+                    <label for="temperature">Temperature</label>
+                    <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7">
+                    <div class="value-display">
+                        <span>0 (Deterministic)</span>
+                        <span id="temperature-value">0.7</span>
+                        <span>2 (Creative)</span>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="top-k">Top K Sampling</label>
+                    <input type="number" id="top-k" min="0" max="100" step="1" value="40">
+                    <div class="value-display">
+                        <span>0 (Disabled)</span>
+                        <span>100 (Max)</span>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="top-p">Top P Sampling</label>
+                    <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.9">
+                    <div class="value-display">
+                        <span>0 (Strict)</span>
+                        <span id="top-p-value">0.9</span>
+                        <span>1 (Broad)</span>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="min-p">Min P Sampling</label>
+                    <input type="range" id="min-p" min="0" max="1" step="0.05" value="0.05">
+                    <div class="value-display">
+                        <span>0 (Disabled)</span>
+                        <span id="min-p-value">0.05</span>
+                        <span>1 (Max)</span>
+                    </div>
+                </div>
+                
+                <div class="setting-item">
+                    <label for="repeat-penalty">Repeat Penalty</label>
+                    <input type="range" id="repeat-penalty" min="1" max="2" step="0.1" value="1.1">
+                    <div class="value-display">
+                        <span>1 (None)</span>
+                        <span id="repeat-penalty-value">1.1</span>
+                        <span>2 (Strong)</span>
+                    </div>
+                </div>
             </div>
-        </div>
-        
-        <div class="setting-item">
-            <label for="top-k">Top K Sampling</label>
-            <input type="number" id="top-k" min="0" max="100" step="1" value="40">
-            <div class="value-display">
-                <span>0 (Disabled)</span>
-                <span>100 (Max)</span>
-            </div>
-        </div>
-        
-        <div class="setting-item">
-            <label for="top-p">Top P Sampling</label>
-            <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.9">
-            <div class="value-display">
-                <span>0 (Strict)</span>
-                <span id="top-p-value">0.9</span>
-                <span>1 (Broad)</span>
-            </div>
-        </div>
-        
-        <div class="setting-item">
-            <label for="min-p">Min P Sampling</label>
-            <input type="range" id="min-p" min="0" max="1" step="0.05" value="0.05">
-            <div class="value-display">
-                <span>0 (Disabled)</span>
-                <span id="min-p-value">0.05</span>
-                <span>1 (Max)</span>
-            </div>
-        </div>
-        
-        <div class="setting-item">
-            <label for="repeat-penalty">Repeat Penalty</label>
-            <input type="range" id="repeat-penalty" min="1" max="2" step="0.1" value="1.1">
-            <div class="value-display">
-                <span>1 (None)</span>
-                <span id="repeat-penalty-value">1.1</span>
-                <span>2 (Strong)</span>
-            </div>
+            
+            <button id="save-settings">Save Settings</button>
+            <button id="reset-settings">Reset to Defaults</button>
         </div>
     </div>
-    
-    <button id="save-settings">Save Settings</button>
-    <button id="reset-settings">Reset to Defaults</button>
 </div>
 
 <script>
@@ -537,6 +615,8 @@
     const newChatButton = document.getElementById('new-chat-button');
     const chatHistoryContainer = document.getElementById('chat-history');
     const modelSelect = document.getElementById('model-select');
+    const uploadButton = document.getElementById('upload-button');
+    const fileInput = document.getElementById('file-input');
 
     // Settings elements
     const temperatureSlider = document.getElementById('temperature');
@@ -574,24 +654,24 @@
 
     // Initialize with a new conversation
     function initNewConversation() {
+    chatBox.innerHTML = '';
         const newConversation = {
             id: Date.now().toString(),
             title: 'New Chat',
             messages: [{
                 role: 'system',
-                content: 'You are a helpful AI assistant.'
+                content: 'You are a helpful AI assistant that can analyze images. When users upload images, describe them in detail and answer any questions about them.'
             },
-                                {
+            {
                 role: 'user',
                 content: 'Hello!',
-                hidden: true  // <--- custom flag to hide in UI
+                hidden: true
             },   
-                       {
+            {
                 role: 'assistant',
-                content: 'Hi there! How can I help you today?'
+                content: 'Hi there! How can I help you today? You can upload images for me to analyze.'
             }]
         };
-        
         currentConversationId = newConversation.id;
         conversations.push(newConversation);
         renderChatHistory();
@@ -621,12 +701,10 @@
     }
 
     function parseMarkdown(text) {
-        // STEP 1: Protect LaTeX blocks so Markdown doesn't touch them
         const placeholder = `\uE000${Math.random().toString(36).slice(2)}\uE001`;
         const latexBlocks = [];
         let index = 0;
 
-        // Regex to match LaTeX expressions: $$...$$, $...$, \( ... \), \[ ... \]
         const latexRegex = /(\$\$[\s\S]+?\$\$|\$[^$\n]+\$|\\\([^\)]+\\\)|\\\[[^\]]+\\\])/g;
 
         text = text.replace(latexRegex, match => {
@@ -636,7 +714,6 @@
             return token;
         });
 
-        // STEP 2: Apply Markdown formatting
         text = text
             .replace(/^####\s+(.*)$/gm, '<h4>$1</h4>')
             .replace(/^###\s+(.*)$/gm, '<h3>$1</h3>')
@@ -652,7 +729,6 @@
             .replace(/^\s*\d+\.\s+(.*)$/gm, '<li>$1</li>')
             .replace(/(<li>.*<\/li>)+/gs, match => `<ul>${match}</ul>`);
 
-        // STEP 3: Wrap non-block lines in <p> tags
         const lines = text.split('\n');
         const output = [];
         let buffer = [];
@@ -677,7 +753,6 @@
         }
         flush();
 
-        // STEP 4: Restore LaTeX expressions
         const restoreRegex = new RegExp(`${placeholder}(\\d+)${placeholder}`, 'g');
         const finalHtml = output.join('\n').replace(restoreRegex, (_, i) => latexBlocks[+i]);
 
@@ -699,19 +774,25 @@
         
         chatBox.innerHTML = '';
         
-        // Only render user and assistant messages (skip system messages)
         conversation.messages.forEach(msg => {
             if (msg.role === 'user' || msg.role === 'assistant') {
                 const messageElement = document.createElement('div');
                 messageElement.classList.add('message', msg.role === 'user' ? 'user-message' : 'ai-message');
                 
                 if (msg.role === 'assistant') {
-                    // Parse markdown for AI messages
                     messageElement.innerHTML = parseMarkdown(msg.content);
-                    // Render any math in this message
                     renderMath(messageElement);
+                } else if (msg.image) {
+                    const img = document.createElement('img');
+                    img.src = msg.image;
+                    img.classList.add('image-message');
+                    messageElement.appendChild(img);
+                    if (msg.content) {
+                        const text = document.createElement('div');
+                        text.textContent = msg.content;
+                        messageElement.appendChild(text);
+                    }
                 } else {
-                    // Keep user messages as plain text (or parse if you want)
                     messageElement.textContent = msg.content;
                 }
                 
@@ -723,22 +804,29 @@
     }
 
     // Function to add a message to the chat display
-    const addMessage = (content, sender) => {
+    const addMessage = (content, sender, imageUrl = null) => {
         const messageElement = document.createElement('div');
         messageElement.classList.add('message', `${sender}-message`);
         
         if (sender === 'ai') {
-            // Parse markdown for AI messages
             messageElement.innerHTML = parseMarkdown(content);
-            // Render any math in this message
             renderMath(messageElement);
+        } else if (imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.classList.add('image-message');
+            messageElement.appendChild(img);
+            if (content) {
+                const text = document.createElement('div');
+                text.textContent = content;
+                messageElement.appendChild(text);
+            }
         } else {
-            // Keep user messages as plain text
             messageElement.textContent = content;
         }
         
         chatBox.appendChild(messageElement);
-        chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to the bottom
+        chatBox.scrollTop = chatBox.scrollHeight;
         return messageElement;
     };
 
@@ -766,7 +854,6 @@
         if (savedSettings) {
             modelSettings = JSON.parse(savedSettings);
             
-            // Update UI elements
             temperatureSlider.value = modelSettings.temperature;
             topKInput.value = modelSettings.top_k;
             topPSlider.value = modelSettings.top_p;
@@ -832,7 +919,7 @@
             return;
         }
         
-        modelSelect.innerHTML = ''; // Clear loading message
+        modelSelect.innerHTML = '';
         
         models.forEach(model => {
             const option = document.createElement('option');
@@ -841,31 +928,63 @@
             modelSelect.appendChild(option);
         });
         
-        // Select the first model by default
         if (models.length > 0) {
             currentModel = models[0];
             modelSelect.value = models[0];
         }
     }
 
+    // Handle image upload
+    function handleImageUpload(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64String = e.target.result.split(',')[1];
+                resolve({
+                    url: e.target.result,
+                    base64: base64String
+                });
+            };
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(file);
+        });
+    }
+
     // Handle form submission
     inputForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const userMessage = userInput.value.trim();
-        if (!userMessage) return;
+        if (!userMessage && !fileInput.files[0]) return;
 
-        // Get current conversation
         let conversation = conversations.find(c => c.id === currentConversationId);
         if (!conversation) {
             initNewConversation();
             conversation = conversations.find(c => c.id === currentConversationId);
         }
 
-        // Add user message to conversation
-        addMessage(userMessage, 'user');
-        conversation.messages.push({ role: 'user', content: userMessage });
+        let imageData = null;
+        if (fileInput.files[0]) {
+            try {
+                imageData = await handleImageUpload(fileInput.files[0]);
+                addMessage(userMessage || 'Image uploaded', 'user', imageData.url);
+                
+                conversation.messages.push({ 
+                    role: 'user', 
+                    content: userMessage || 'Image uploaded',
+                    image: imageData.url
+                });
+                
+                fileInput.value = '';
+            } catch (error) {
+                console.error('Error uploading image:', error);
+                addMessage('Error uploading image', 'ai');
+                return;
+            }
+        } else {
+            addMessage(userMessage, 'user');
+            conversation.messages.push({ role: 'user', content: userMessage });
+        }
         
-        // Update conversation title if this is the first user message
         if (conversation.messages.filter(m => m.role === 'user').length === 1) {
             conversation.title = userMessage.length > 30 ? userMessage.substring(0, 30) + '...' : userMessage;
             renderChatHistory();
@@ -874,7 +993,6 @@
         userInput.value = '';
         sendButton.disabled = true;
 
-        // Add a typing indicator
         const typingIndicator = document.createElement('div');
         typingIndicator.classList.add('message', 'ai-message');
         typingIndicator.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
@@ -882,19 +1000,38 @@
         chatBox.scrollTop = chatBox.scrollHeight;
 
         try {
-            // Only send system message and the last few messages to avoid hitting token limits
             const messagesToSend = [
-                conversation.messages[0], // system message
-                ...conversation.messages.slice(-6) // last 3 exchanges (user + assistant)
+                conversation.messages[0],
+                ...conversation.messages.slice(-6)
             ];
 
-            // Create a response container that we'll stream into
+            const apiMessages = messagesToSend.map(msg => {
+                if (msg.image && msg.role === 'user') {
+                    return {
+                        role: msg.role,
+                        content: [
+                            { type: 'text', text: msg.content || 'Describe this image' },
+                            { 
+                                type: 'image_url',
+                                image_url: {
+                                    url: `data:image/jpeg;base64,${imageData.base64}`
+                                }
+                            }
+                        ]
+                    };
+                } else {
+                    return {
+                        role: msg.role,
+                        content: msg.content
+                    };
+                }
+            });
+
             const responseContainer = document.createElement('div');
             responseContainer.classList.add('message', 'ai-message');
             chatBox.removeChild(typingIndicator);
             chatBox.appendChild(responseContainer);
             
-            // Create a thinking bubble container (will be shown if chain-of-thought is used)
             let thinkingBubble = null;
             
             const response = await fetch(apiUrl, {
@@ -904,7 +1041,7 @@
                 },
                 body: JSON.stringify({
                     model: currentModel,
-                    messages: messagesToSend,
+                    messages: apiMessages,
                     temperature: modelSettings.temperature,
                     top_k: modelSettings.top_k,
                     top_p: modelSettings.top_p,
@@ -918,7 +1055,6 @@
                 throw new Error(`API Error: ${response.status} ${response.statusText}`);
             }
 
-            // Process the streaming response
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let fullResponse = '';
@@ -930,7 +1066,7 @@
                 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split('\n');
-                buffer = lines.pop(); // Keep the last incomplete line in buffer
+                buffer = lines.pop();
                 
                 for (const line of lines) {
                     if (line.startsWith('data:') && !line.includes('[DONE]')) {
@@ -941,7 +1077,6 @@
                             if (content) {
                                 fullResponse += content;
                                 
-                                // Check if this is chain-of-thought (might start with "Thought:" or similar)
                                 if (content.includes('Thought:') || (thinkingBubble && !fullResponse.includes('\n\n'))) {
                                     if (!thinkingBubble) {
                                         thinkingBubble = addThinkingBubble(content);
@@ -949,13 +1084,11 @@
                                         thinkingBubble.textContent += content;
                                     }
                                 } else {
-                                    // If we had a thinking bubble but now we're in the main response, remove it
                                     if (thinkingBubble) {
                                         chatBox.removeChild(thinkingBubble);
                                         thinkingBubble = null;
                                     }
                                     
-                                    // Update the main response
                                     responseContainer.innerHTML = parseMarkdown(fullResponse);
                                     renderMath(responseContainer);
                                 }
@@ -969,20 +1102,30 @@
                 }
             }
 
-            // Final update to ensure all content is rendered
             responseContainer.innerHTML = parseMarkdown(fullResponse);
             renderMath(responseContainer);
             
-            // Add the final response to the conversation history
             conversation.messages.push({ role: 'assistant', content: fullResponse });
 
         } catch (error) {
             console.error('Error fetching from local LLM:', error);
             chatBox.removeChild(typingIndicator);
-            addMessage(`Error: Could not connect to the model. Make sure LM Studio server and Cloudflare Tunnel are running. (${error.message})`, 'ai');
+            addMessage(`Error: Could not connect to the model. Make sure the server supports image processing. (${error.message})`, 'ai');
         } finally {
             sendButton.disabled = false;
             userInput.focus();
+        }
+    });
+
+    // Handle upload button click
+    uploadButton.addEventListener('click', () => {
+        fileInput.click();
+    });
+
+    // Handle file selection
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) {
+            console.log('Image selected:', fileInput.files[0].name);
         }
     });
 
@@ -990,12 +1133,17 @@
     newChatButton.addEventListener('click', (e) => {
         e.preventDefault();
         initNewConversation();
+    // Clear any existing input
+    userInput.value = '';
+    fileInput.value = '';
+    
+    // Focus the input for new message
+    userInput.focus();
     });
 
     // Handle model selection change
     modelSelect.addEventListener('change', (e) => {
         currentModel = e.target.value;
-        // Start a new conversation when model changes
         initNewConversation();
     });
 
